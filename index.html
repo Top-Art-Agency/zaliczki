@@ -255,22 +255,24 @@ dialog h3 { font-family: var(--f-display); margin: 0; font-size: 1.1rem; }
     if (!window.firebase || !FIREBASE_CONFIG.apiKey || !FIREBASE_CONFIG.databaseURL) { $('setupNote').hidden = false; return Promise.resolve(null); }
     firebase.initializeApp(FIREBASE_CONFIG);
     const auth = firebase.auth();
-    auth.getRedirectResult().catch(e => { $('loginError').textContent = 'Nie udało się zalogować (' + e.code + ').'; });
     return new Promise(res => {
-      const off = auth.onAuthStateChanged(u => {
-        if (u) { $('login').hidden = true; off(); res(u); }
-        else $('login').hidden = false;
-      });
+      let done = false;
+      authResolve = u => { if (done || !u) return; done = true; $('login').hidden = true; res(u); };
+      auth.onAuthStateChanged(u => { if (u) authResolve(u); else if (!done) $('login').hidden = false; });
+      // Safari potrafi długo (albo wcale) nie zgłosić stanu logowania – wtedy i tak pokaż ekran logowania
+      setTimeout(() => { if (!done) $('login').hidden = false; }, 2500);
     });
   }
-  $('loginBtn').onclick = async () => {
+  let authResolve = () => {};
+  $('loginBtn').onclick = () => {
     $('loginError').textContent = '';
     const p = new firebase.auth.GoogleAuthProvider();
-    try { await firebase.auth().signInWithPopup(p); }
-    catch (e) {
-      if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') firebase.auth().signInWithRedirect(p);
-      else if (e.code !== 'auth/popup-closed-by-user') $('loginError').textContent = 'Nie udało się zalogować (' + e.code + ').';
-    }
+    p.setCustomParameters({ prompt: 'select_account' });
+    // wywołane od razu w kliknięciu, żeby Safari nie zablokował okna logowania
+    firebase.auth().signInWithPopup(p).then(r => authResolve(r.user)).catch(e => {
+      if (e.code === 'auth/popup-blocked') $('loginError').textContent = 'Przeglądarka zablokowała okno logowania. Zezwól na wyskakujące okna dla tej strony i spróbuj ponownie.';
+      else if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') $('loginError').textContent = 'Nie udało się zalogować (' + e.code + ').';
+    });
   };
   $('logout').onclick = () => firebase.auth().signOut().then(() => location.reload());
   const clone = o => JSON.parse(JSON.stringify(o));
