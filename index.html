@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2f3f8f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Dzienny limit wydatków</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: jedna wąska kolumna — przełącznik Prywatne / Karta służbowa, duża liczba, bilans, dodawanie, lista */
+:root {
+  --bg: #f3f4f7;
+  --paper: #ffffff;
+  --ink: #161a26;
+  --muted: #5f6577;
+  --line: #dcdfe7;
+  --accent: #2f3f8f;
+  --accent-soft: #e6e9f6;
+  --neg: #b4362b;
+  --neg-soft: #f8e1dd;
+  --pos: #217a4a;
+  --pos-soft: #dff1e6;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121420; --paper: #1a1d2b; --ink: #e6e8f0; --muted: #9a9fb2; --line: #2c3043;
+    --accent: #8fa0f0; --accent-soft: #242a47; --neg: #ff8a7a; --neg-soft: #3a211e;
+    --pos: #6fd39b; --pos-soft: #1b3326; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121420; --paper: #1a1d2b; --ink: #e6e8f0; --muted: #9a9fb2; --line: #2c3043;
+  --accent: #8fa0f0; --accent-soft: #242a47; --neg: #ff8a7a; --neg-soft: #3a211e;
+  --pos: #6fd39b; --pos-soft: #1b3326; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body); }
+.wrap { max-width: 520px; margin: 0 auto; padding: 24px 16px 56px; display: grid; gap: 20px; }
+h1 { font-family: var(--f-display); font-size: 1.3rem; font-weight: 700; margin: 0; }
+.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+.label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+button { font: inherit; cursor: pointer; color: inherit; }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.period { display: flex; align-items: center; gap: 2px; color: var(--muted); font-size: .85rem; min-height: 30px; }
+.ghost { background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; }
+.ghost:hover { border-color: var(--accent); }
+.arrow { border: 0; background: none; padding: 2px 8px; color: var(--muted); font-size: 1.1rem; border-radius: 6px; }
+.arrow:hover { color: var(--ink); background: var(--accent-soft); }
+
+.tabs { display: grid; grid-template-columns: 1fr 1fr; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+.tabs button { border: 0; background: none; padding: 8px; border-radius: 7px; font-weight: 500; color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--paper); }
+
+.banner { background: var(--accent-soft); border-radius: 10px; padding: 10px 14px; font-size: .88rem; }
+
+.hero { display: grid; gap: 6px; padding-block: 8px; }
+.big { font-family: var(--f-num); font-size: clamp(2.4rem, 11vw, 3.4rem); font-weight: 500; line-height: 1.05; letter-spacing: -.02em; }
+.big.neg { color: var(--neg); }
+.sub { color: var(--muted); font-size: .88rem; }
+.chip { justify-self: start; display: inline-flex; gap: 8px; align-items: baseline; padding: 6px 12px; border-radius: 99px; font-size: .92rem; font-weight: 500; }
+.chip.neg { background: var(--neg-soft); color: var(--neg); }
+.chip.pos { background: var(--pos-soft); color: var(--pos); }
+
+form.add { display: flex; flex-wrap: wrap; gap: 8px; }
+form.add input { min-width: 0; }
+input[type=number], input[type=text], input[type=date] {
+  font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px;
+}
+#amount { flex: 0 1 120px; font-family: var(--f-num); }
+#note { flex: 1 1 150px; }
+#date { flex: 0 1 150px; font-size: .88rem; }
+.primary { background: var(--accent); color: var(--paper); border: 0; border-radius: 8px; padding: 9px 16px; font-weight: 600; }
+.primary:hover { filter: brightness(1.08); }
+
+.list { display: grid; margin: 0; padding: 0; list-style: none; }
+.list li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: .92rem; }
+.list .d { color: var(--muted); font-size: .8rem; flex: 0 0 auto; min-width: 46px; }
+.list .n { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.list .x { background: none; border: 0; color: var(--muted); font-size: 1.1rem; line-height: 1; padding: 2px 6px; border-radius: 6px; }
+.list .x:hover { color: var(--neg); background: var(--neg-soft); }
+.list .empty { color: var(--muted); border: 0; }
+.settle { display: inline-flex; padding: 4px; margin: -4px 0 -4px -4px; cursor: pointer; }
+.settle input { width: 18px; height: 18px; accent-color: var(--pos); cursor: pointer; margin: 0; }
+.list li.done .n, .list li.done .num { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line); }
+h2 { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; margin: 0 0 4px; }
+details summary { cursor: pointer; color: var(--muted); font-size: .88rem; padding: 4px 0; }
+.login { position: fixed; inset: 0; background: var(--bg); display: grid; place-items: center; padding: 16px; z-index: 10; }
+.login-box { max-width: 340px; display: grid; gap: 12px; text-align: center; }
+.login-box p { margin: 0; color: var(--muted); }
+.login-err { color: var(--neg) !important; font-size: .85rem; min-height: 1.2em; }
+.head-right { display: grid; justify-items: end; gap: 4px; }
+.sync { font-size: .72rem; color: var(--pos); }
+.sync::before { content: "● "; }
+.sync.bad { color: var(--neg); }
+.save-state { font-size: .78rem; color: var(--muted); min-height: 1.2em; }
+
+dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--paper); color: var(--ink); padding: 0; width: min(420px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgba(10, 12, 24, .45); }
+dialog form { padding: 20px; display: grid; gap: 14px; }
+dialog h3 { font-family: var(--f-display); margin: 0; font-size: 1.1rem; }
+.fields { display: grid; gap: 14px; }
+.field { display: grid; gap: 4px; }
+.field label { font-weight: 500; font-size: .9rem; }
+.field small { color: var(--muted); font-size: .78rem; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: .88rem; }
+.check input { margin-top: 4px; }
+.calc { background: var(--bg); border-radius: 8px; padding: 10px 12px; font-size: .85rem; }
+.actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Dzienny limit</h1>
+      <div class="period" id="periodBar">
+        <button class="arrow" id="prev" aria-label="Poprzedni okres">‹</button>
+        <span id="periodLabel" class="num"></span>
+        <button class="arrow" id="next" aria-label="Następny okres">›</button>
+      </div>
+    </div>
+    <div class="head-right">
+      <button class="ghost" id="openSettings">Ustawienia</button>
+      <span class="sync" id="syncState" role="status">Łączenie z kontem…</span>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tabPriv" aria-selected="true">Prywatne</button>
+    <button role="tab" id="tabBiz" aria-selected="false">Karta służbowa</button>
+  </div>
+
+  <div class="banner" id="setupNote" hidden>Brak konfiguracji Firebase w pliku index.html. Dane zapisują się tylko w tej przeglądarce.</div>
+  <div class="banner" id="exampleBanner" hidden></div>
+
+  <section class="hero" aria-live="polite">
+    <div class="label" id="heroLabel"></div>
+    <div class="big" id="heroValue">–</div>
+    <div class="sub" id="heroSub"></div>
+    <div class="chip" id="chip" hidden></div>
+  </section>
+
+  <form class="add" id="addForm">
+    <input type="number" id="amount" step="0.01" inputmode="decimal" placeholder="Kwota zł" aria-label="Kwota w złotych" required>
+    <input type="text" id="note" placeholder="Na co?" aria-label="Opis wydatku" maxlength="60">
+    <input type="date" id="date" aria-label="Data wydatku">
+    <button class="primary" type="submit">Dodaj</button>
+  </form>
+
+  <section>
+    <h2 id="listTitle"></h2>
+    <ul class="list" id="list"></ul>
+    <details id="moreWrap">
+      <summary>Wszystkie wydatki prywatne w tym okresie</summary>
+      <ul class="list" id="moreList"></ul>
+    </details>
+    <div class="save-state" id="saveState"></div>
+  </section>
+</div>
+
+<section class="login" id="login" hidden>
+  <div class="login-box">
+    <h1>Dzienny limit</h1>
+    <p>Zaloguj się, żeby mieć te same dane na telefonie i komputerze.</p>
+    <button class="primary" type="button" id="loginBtn">Zaloguj przez Google</button>
+    <p class="login-err" id="loginError" role="alert"></p>
+  </div>
+</section>
+
+<dialog id="settings">
+  <form method="dialog" id="settingsForm">
+    <h3 id="settingsTitle">Ustawienia</h3>
+    <div class="fields" id="privFields">
+      <div class="field">
+        <label for="sIncome">Wypłata (zł)</label>
+        <input type="number" id="sIncome" step="0.01" min="0">
+      </div>
+      <div class="field">
+        <label for="sSavings">Ile chcesz odłożyć (zł)</label>
+        <input type="number" id="sSavings" step="0.01" min="0">
+      </div>
+      <div class="field">
+        <label for="sFixed">Stałe opłaty (zł)</label>
+        <input type="number" id="sFixed" step="0.01" min="0">
+        <small>Czynsz, rachunki, abonamenty. Odejmowane z góry.</small>
+      </div>
+      <div class="field">
+        <label for="sStart">Dzień wypłaty</label>
+        <input type="number" id="sStart" min="1" max="28" step="1">
+        <small>Okres trwa od tego dnia do dnia przed kolejną wypłatą. Wpisz 1 dla miesiąca kalendarzowego.</small>
+      </div>
+      <label class="check"><input type="checkbox" id="sSurplus"> <span>Niewydane pieniądze też przechodzą na następny dzień (domyślnie przechodzi tylko minus).</span></label>
+      <div class="calc num" id="calcPreview"></div>
+    </div>
+    <div class="fields" id="bizFields">
+      <div class="field">
+        <label for="sBalance">Aktualny stan środków na karcie (zł)</label>
+        <input type="number" id="sBalance" step="0.01">
+        <small>Wpisz kwotę, którą widzisz teraz w banku. Wydatki dodane od tej chwili będą od niej odejmowane.</small>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="button" class="ghost" id="logout" hidden style="margin-right:auto">Wyloguj</button>
+      <button type="button" class="ghost" id="cancelSettings">Anuluj</button>
+      <button type="submit" class="primary">Zapisz</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const zl = new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = v => zl.format(Math.abs(v) < 0.005 ? 0 : v);
+  const MON = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
+  const key = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const fromKey = k => new Date(k + 'T00:00:00');
+  const short = d => d.getDate() + ' ' + MON[d.getMonth()];
+  const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const r2 = v => Math.round(v * 100) / 100;
+  const EPS = 0.004;
+
+  const EXAMPLE = { income: 6200, savings: 1000, fixed: 1800, startDay: 10, carrySurplus: false };
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  // ---------- storage: private per-user db, browser fallback ----------
+  let db = null, uid = null, mode = 'connecting'; // connecting | account | local
+  const docPath = name => 'users/' + uid + '/' + name;
+
+  // ---------- Firebase: wklej tutaj konfigurację swojego projektu ----------
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyA9G3Cvye04oBRg1_AtaMRvoWe7HaPnuMA",
+    authDomain: "rozliczenia-585d1.firebaseapp.com",
+    databaseURL: "https://rozliczenia-585d1-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "rozliczenia-585d1",
+    appId: "1:300629557867:web:30bf9300e6299ecaf4672e"
+  };
+
+  function connectFirebase() {
+    if (!window.firebase || !FIREBASE_CONFIG.apiKey || !FIREBASE_CONFIG.databaseURL) { $('setupNote').hidden = false; return Promise.resolve(null); }
+    firebase.initializeApp(FIREBASE_CONFIG);
+    const auth = firebase.auth();
+    auth.getRedirectResult().catch(e => { $('loginError').textContent = 'Nie udało się zalogować (' + e.code + ').'; });
+    return new Promise(res => {
+      const off = auth.onAuthStateChanged(u => {
+        if (u) { $('login').hidden = true; off(); res(u); }
+        else $('login').hidden = false;
+      });
+    });
+  }
+  $('loginBtn').onclick = async () => {
+    $('loginError').textContent = '';
+    const p = new firebase.auth.GoogleAuthProvider();
+    try { await firebase.auth().signInWithPopup(p); }
+    catch (e) {
+      if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') firebase.auth().signInWithRedirect(p);
+      else if (e.code !== 'auth/popup-closed-by-user') $('loginError').textContent = 'Nie udało się zalogować (' + e.code + ').';
+    }
+  };
+  $('logout').onclick = () => firebase.auth().signOut().then(() => location.reload());
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const local = name => { try { const r = localStorage.getItem('dzienny-limit:' + name); return r ? JSON.parse(r) : null; } catch (e) { return null; } };
+  const store = {
+    async get(name) {
+      if (mode === 'account') { const s = await db.ref(docPath(name)).get(); return s.exists() ? clone(s.val()) : null; }
+      return local(name);
+    },
+    async set(name, data) {
+      if (mode === 'account') return db.ref(docPath(name)).set(data);
+      if (mode === 'connecting') throw { code: 'jeszcze nie połączono' };
+      localStorage.setItem('dzienny-limit:' + name, JSON.stringify(data));
+    }
+  };
+  const inflight = {};
+  function setStatus(text, bad) { const el = $('syncState'); el.textContent = text; el.classList.toggle('bad', !!bad); }
+  function notReady() {
+    if (mode !== 'connecting') return false;
+    $('saveState').textContent = 'Chwila, łączę się z Twoim kontem… Spróbuj za sekundę.';
+    return true;
+  }
+  function watchDoc(name, apply) {
+    const ref = db.ref(docPath(name));
+    const cb = s => { if (inflight[name]) return; apply(s.exists() ? clone(s.val()) : null); };
+    ref.on('value', cb, e => setStatus('Synchronizacja przerwana (' + (e && (e.code || e.message)) + '). Odśwież stronę.', true));
+    return () => ref.off('value', cb);
+  }
+  let unsubPeriod = null;
+  function watchPeriod() {
+    if (mode !== 'account') return;
+    if (unsubPeriod) unsubPeriod();
+    const id = periodId(periodStart);
+    unsubPeriod = watchDoc(id, data => {
+      if (!data || periodId(periodStart) !== id) return;
+      if (!data.days) data.days = {};
+      cache[id] = clone(data); period = data; render();
+    });
+  }
+  function applySettings(data) {
+    if (!data) return;
+    const restart = privExample || !settings || data.startDay !== settings.startDay;
+    settings = data; privExample = false;
+    if (restart) { periodStart = periodFor(today, settings.startDay); loadPeriod(); } else render();
+  }
+  function applyBiz(data) {
+    if (!data) return;
+    biz = { balance: 0, balanceAt: 0, items: [], ...data }; bizExample = false; render();
+  }
+
+  // ---------- state ----------
+  let settings = null, periodStart = null, period = null;
+  let privExample = true, bizExample = true;
+  let biz = null; // {balance, balanceAt, items:[{a,n,d,s,t}]}
+  let tab = 'priv';
+  try { if (localStorage.getItem('dzienny-limit:tab') === 'biz') tab = 'biz'; } catch (e) {}
+  const cache = {};
+
+  function periodFor(date, startDay) {
+    let s = new Date(date.getFullYear(), date.getMonth(), startDay);
+    if (date < s) s = new Date(date.getFullYear(), date.getMonth() - 1, startDay);
+    return s;
+  }
+  const periodEnd = s => addDays(new Date(s.getFullYear(), s.getMonth() + 1, s.getDate()), -1);
+  const periodId = s => 'p-' + key(s);
+  const isCurrent = () => today >= periodStart && today <= periodEnd(periodStart);
+  const refDay = () => isCurrent() ? today : (today < periodStart ? periodStart : periodEnd(periodStart));
+
+  async function loadPeriod() {
+    const id = periodId(periodStart);
+    if (!privExample && !(id in cache)) { try { cache[id] = await store.get(id); } catch (e) { cache[id] = null; } }
+    if (!privExample && mode === 'account' && !cache[id] && local(id)) { cache[id] = local(id); queueSave(id, cache[id]); }
+    const stored = privExample ? null : cache[id];
+    period = stored || { income: settings.income, savings: settings.savings, fixed: settings.fixed, days: {} };
+    if (!period.days) period.days = {};
+    if (privExample && isCurrent()) {
+      const spends = [[[38.5, 'Biedronka'], [14, 'kawa']], [[212, 'stacja paliw']], [[61.2, 'Lidl']], [], [[25, 'obiad'], [89.99, 'apteka']]];
+      let i = 0;
+      for (let d = new Date(periodStart); d <= today && i < spends.length; d = addDays(d, 1), i++)
+        if (spends[i].length) period.days[key(d)] = spends[i].map(([a, n]) => ({ a, n }));
+    }
+    resetDate();
+    watchPeriod();
+    render();
+  }
+
+  function exampleBiz() {
+    return { balance: 1500, balanceAt: 0, items: [
+      { a: 186.4, n: 'paliwo – wyjazd do klienta', d: key(addDays(today, -3)), s: true, t: 1 },
+      { a: 64, n: 'parking', d: key(today), s: false, t: 2 }
+    ] };
+  }
+
+  // ---------- private math ----------
+  function computePriv() {
+    const end = periodEnd(periodStart);
+    const nDays = Math.round((end - periodStart) / 864e5) + 1;
+    const base = (period.income - period.savings - period.fixed) / nDays;
+    const ref = refDay();
+    let carry = 0, cumBase = 0, cumSpent = 0, refRow = null;
+    for (let i = 0; i < nDays; i++) {
+      const d = addDays(periodStart, i), k = key(d);
+      const spent = (period.days[k] || []).reduce((s, e) => s + e.a, 0);
+      const limit = base + carry, left = limit - spent;
+      if (d <= ref) { cumBase += base; cumSpent += spent; }
+      if (k === key(ref)) refRow = { carryIn: carry, limit, spent, left };
+      carry = left < 0 ? left : (settings.carrySurplus ? left : 0);
+    }
+    return { base, refRow, balance: cumBase - cumSpent };
+  }
+
+  // ---------- render ----------
+  function entryLi(dateKey, e, onDelete, onSettle) {
+    const li = document.createElement('li');
+    if (onSettle) {
+      const lab = document.createElement('label'); lab.className = 'settle';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!e.s;
+      cb.setAttribute('aria-label', 'Rozliczone: ' + (e.n || 'wydatek') + ' ' + fmt(e.a));
+      cb.onchange = () => onSettle(cb.checked);
+      lab.appendChild(cb); li.appendChild(lab);
+      if (e.s) li.classList.add('done');
+    }
+    const d = document.createElement('span'); d.className = 'd num'; d.textContent = short(fromKey(dateKey));
+    const n = document.createElement('span'); n.className = 'n'; n.textContent = e.n || 'Wydatek';
+    const a = document.createElement('span'); a.className = 'num'; a.textContent = fmt(e.a);
+    const x = document.createElement('button'); x.className = 'x'; x.type = 'button'; x.textContent = '×';
+    x.setAttribute('aria-label', 'Usuń ' + (e.n || 'wydatek') + ' ' + fmt(e.a));
+    x.onclick = onDelete;
+    li.append(d, n, a, x);
+    return li;
+  }
+  function emptyLi(text) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = text; return li; }
+
+  function render() {
+    const end = periodEnd(periodStart);
+    $('periodLabel').textContent = short(periodStart) + ' – ' + short(end) + ' ' + end.getFullYear();
+    $('periodBar').style.visibility = tab === 'priv' ? 'visible' : 'hidden';
+    $('tabPriv').setAttribute('aria-selected', tab === 'priv');
+    $('tabBiz').setAttribute('aria-selected', tab === 'biz');
+    const ex = tab === 'priv' ? privExample : bizExample;
+    $('exampleBanner').hidden = !ex;
+    $('exampleBanner').textContent = tab === 'priv'
+      ? 'Przykładowe liczby. Otwórz „Ustawienia”, wpisz wypłatę i oszczędności, potem zapisz.'
+      : 'Przykładowe liczby. Otwórz „Ustawienia” i wpisz aktualny stan środków na karcie.';
+    $('openSettings').textContent = tab === 'priv' ? 'Ustawienia' : 'Stan środków';
+    const chip = $('chip');
+    const list = $('list'); list.textContent = '';
+
+    if (tab === 'priv') {
+      const c = computePriv(), r = c.refRow;
+      $('heroLabel').textContent = isCurrent() ? 'Dziś możesz jeszcze wydać' : 'Zostało z dnia ' + short(refDay());
+      $('heroValue').textContent = fmt(r.left);
+      $('heroValue').classList.toggle('neg', r.left < -EPS);
+      $('heroSub').textContent = r.carryIn < -EPS
+        ? 'Limit ' + fmt(r.limit) + ' (bazowo ' + fmt(c.base) + ', minus ' + fmt(-r.carryIn) + ' z wczoraj)'
+        : 'Limit na dziś ' + fmt(r.limit) + ', wydane ' + fmt(r.spent);
+      const b = c.balance;
+      chip.hidden = false;
+      chip.className = 'chip ' + (b < -EPS ? 'neg' : 'pos');
+      chip.textContent = '';
+      const t = document.createElement('span'); t.textContent = b < -EPS ? 'W plecy' : 'Na plus';
+      const v = document.createElement('span'); v.className = 'num'; v.textContent = (b < -EPS ? '−' : '+') + fmt(Math.abs(b));
+      chip.append(t, v);
+
+      const refKey = key(refDay());
+      $('listTitle').textContent = isCurrent() ? 'Dzisiejsze wydatki' : 'Wydatki z ' + short(fromKey(refKey));
+      const todays = period.days[refKey] || [];
+      if (!todays.length) list.appendChild(emptyLi('Nic jeszcze nie wydałeś.'));
+      todays.forEach((e, i) => list.appendChild(entryLi(refKey, e, () => removePriv(refKey, i))));
+
+      $('moreWrap').hidden = false;
+      const more = $('moreList'); more.textContent = '';
+      const keys = Object.keys(period.days).sort().reverse();
+      if (!keys.length) more.appendChild(emptyLi('Brak wydatków w tym okresie.'));
+      keys.forEach(k => period.days[k].forEach((e, i) => more.appendChild(entryLi(k, e, () => removePriv(k, i)))));
+    } else {
+      const since = biz.items.filter(e => (e.t || 0) > (biz.balanceAt || 0));
+      const now = biz.balance - since.reduce((s, e) => s + e.a, 0);
+      $('heroLabel').textContent = 'Stan środków na karcie';
+      $('heroValue').textContent = fmt(now);
+      $('heroValue').classList.toggle('neg', now < -EPS);
+      const open = biz.items.filter(e => !e.s);
+      $('heroSub').textContent = open.length
+        ? 'Do rozliczenia ' + fmt(open.reduce((s, e) => s + e.a, 0)) + ' (' + open.length + ' ' + (open.length === 1 ? 'pozycja' : open.length < 5 ? 'pozycje' : 'pozycji') + ')'
+        : (biz.items.length ? 'Wszystko rozliczone' : '');
+      chip.hidden = true;
+      $('listTitle').textContent = 'Wydatki z karty';
+      const items = biz.items.map((e, i) => ({ e, i })).sort((a, b) => (b.e.d.localeCompare(a.e.d)) || ((b.e.t || 0) - (a.e.t || 0)));
+      if (!items.length) list.appendChild(emptyLi('Brak wydatków służbowych.'));
+      items.forEach(({ e, i }) => list.appendChild(entryLi(e.d, e,
+        () => { biz.items.splice(i, 1); persistBiz(); render(); },
+        checked => { biz.items[i].s = checked; persistBiz(); render(); })));
+      $('moreWrap').hidden = true;
+    }
+  }
+
+  function removePriv(k, i) {
+    period.days[k].splice(i, 1);
+    if (!period.days[k].length) delete period.days[k];
+    persist(); render();
+  }
+
+  function resetDate() {
+    const inp = $('date');
+    if (tab === 'priv') { inp.min = key(periodStart); inp.max = key(periodEnd(periodStart)); inp.value = key(refDay()); }
+    else { inp.removeAttribute('min'); inp.max = key(today); inp.value = key(today); }
+  }
+
+  // ---------- saving ----------
+  let saveChain = Promise.resolve();
+  function queueSave(name, data) {
+    $('saveState').textContent = 'Zapisuję…';
+    inflight[name] = (inflight[name] || 0) + 1;
+    saveChain = saveChain.then(() => store.set(name, data)).then(
+      () => { $('saveState').textContent = mode === 'account' ? 'Zapisano na koncie' : 'Zapisano w tej przeglądarce'; },
+      e => { $('saveState').textContent = 'Nie udało się zapisać (' + ((e && e.code) || 'błąd') + '). Odśwież stronę i spróbuj ponownie.'; setStatus('Błąd zapisu', true); })
+      .then(() => { inflight[name]--; });
+  }
+  function persist() {
+    if (privExample) return;
+    const id = periodId(periodStart), snap = JSON.parse(JSON.stringify(period));
+    cache[id] = snap; queueSave(id, snap);
+  }
+  function persistBiz() { if (!bizExample) queueSave('biz', JSON.parse(JSON.stringify(biz))); }
+
+  $('addForm').addEventListener('submit', ev => {
+    ev.preventDefault();
+    const a = r2(parseFloat(String($('amount').value).replace(',', '.')));
+    if (!isFinite(a) || a === 0) return;
+    if (notReady()) return;
+    if (tab === 'priv' ? privExample : bizExample) { openSettings(); return; }
+    let d = $('date').value || key(today);
+    const n = $('note').value.trim();
+    if (tab === 'priv') {
+      if (d < key(periodStart) || d > key(periodEnd(periodStart))) d = key(refDay());
+      (period.days[d] = period.days[d] || []).push({ a, n });
+      persist();
+    } else {
+      biz.items.push({ a, n, d, s: false, t: Date.now() });
+      persistBiz();
+    }
+    $('amount').value = ''; $('note').value = ''; resetDate(); $('amount').focus();
+    render();
+  });
+
+  function setTab(t) {
+    tab = t;
+    try { localStorage.setItem('dzienny-limit:tab', t); } catch (e) {}
+    $('note').placeholder = t === 'priv' ? 'Na co?' : 'Na co? (np. paliwo, hotel)';
+    resetDate();
+    render();
+  }
+  $('tabPriv').onclick = () => setTab('priv');
+  $('tabBiz').onclick = () => setTab('biz');
+
+  // ---------- settings ----------
+  const dlg = $('settings');
+  function updatePreview() {
+    const inc = +$('sIncome').value || 0, sav = +$('sSavings').value || 0, fix = +$('sFixed').value || 0;
+    const sd = Math.min(28, Math.max(1, parseInt($('sStart').value) || 1));
+    const s = periodFor(today, sd), n = Math.round((periodEnd(s) - s) / 864e5) + 1;
+    const pool = inc - sav - fix;
+    $('calcPreview').textContent = 'Do wydania ' + fmt(pool) + ' przez ' + n + ' dni = ' + fmt(pool / n) + ' dziennie';
+  }
+  function openSettings() {
+    const priv = tab === 'priv';
+    $('privFields').hidden = !priv; $('bizFields').hidden = priv;
+    ['sIncome', 'sSavings', 'sStart'].forEach(id => { $(id).required = priv; });
+    $('sBalance').required = !priv;
+    $('settingsTitle').textContent = priv ? 'Wypłata i oszczędności' : 'Stan środków na karcie';
+    if (priv) {
+      $('sIncome').value = privExample ? '' : period.income;
+      $('sSavings').value = privExample ? '' : period.savings;
+      $('sFixed').value = privExample ? '' : period.fixed;
+      $('sIncome').placeholder = 'np. ' + EXAMPLE.income; $('sSavings').placeholder = 'np. ' + EXAMPLE.savings; $('sFixed').placeholder = 'np. ' + EXAMPLE.fixed;
+      $('sStart').value = settings.startDay;
+      $('sSurplus').checked = !!settings.carrySurplus;
+      updatePreview();
+    } else {
+      const since = biz.items.filter(e => (e.t || 0) > (biz.balanceAt || 0));
+      $('sBalance').value = bizExample ? '' : r2(biz.balance - since.reduce((s, e) => s + e.a, 0));
+      $('sBalance').placeholder = 'np. 1500';
+    }
+    dlg.showModal();
+  }
+  ['sIncome', 'sSavings', 'sFixed', 'sStart'].forEach(id => $(id).addEventListener('input', updatePreview));
+  $('openSettings').onclick = openSettings;
+  $('cancelSettings').onclick = () => dlg.close();
+  $('settingsForm').addEventListener('submit', async ev => {
+    ev.preventDefault();
+    if (notReady()) return;
+    dlg.close();
+    if (tab === 'biz') {
+      const balance = r2(parseFloat(String($('sBalance').value).replace(',', '.')) || 0);
+      if (bizExample) { biz = { balance, balanceAt: Date.now(), items: [] }; bizExample = false; }
+      else { biz.balance = balance; biz.balanceAt = Date.now(); }
+      persistBiz(); render();
+      return;
+    }
+    const income = r2(+$('sIncome').value || 0), savings = r2(+$('sSavings').value || 0), fixed = r2(+$('sFixed').value || 0);
+    const startDay = Math.min(28, Math.max(1, parseInt($('sStart').value) || 1));
+    const reload = privExample || startDay !== settings.startDay;
+    settings = { income, savings, fixed, startDay, carrySurplus: $('sSurplus').checked };
+    privExample = false;
+    queueSave('settings', clone(settings));
+    if (reload) { periodStart = periodFor(today, startDay); await loadPeriod(); }
+    Object.assign(period, { income, savings, fixed });
+    persist(); render();
+  });
+
+  $('prev').onclick = () => { periodStart = new Date(periodStart.getFullYear(), periodStart.getMonth() - 1, settings.startDay); loadPeriod(); };
+  $('next').onclick = () => { periodStart = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, settings.startDay); loadPeriod(); };
+
+  // ---------- boot ----------
+  async function boot() {
+    settings = { ...EXAMPLE };
+    biz = exampleBiz();
+    periodStart = periodFor(today, settings.startDay);
+    setTab(tab);
+    await loadPeriod();
+    setStatus('Łączenie…');
+    const user = await connectFirebase();
+    if (user) { db = firebase.database(); uid = user.uid; }
+    mode = db ? 'account' : 'local';
+    setStatus(db ? 'Zapis w chmurze' : 'Zapis tylko w tej przeglądarce', !db);
+    $('logout').hidden = !db;
+    $('saveState').textContent = '';
+    let saved = null, savedBiz = null;
+    try { [saved, savedBiz] = await Promise.all([store.get('settings'), store.get('biz')]); }
+    catch (e) { setStatus('Nie udało się wczytać danych (' + ((e && e.code) || 'błąd') + ')', true); }
+    if (mode === 'account') {
+      // dane wpisane wcześniej, gdy strona zapisała je tylko w przeglądarce
+      const ls = local('settings'), lb = local('biz');
+      if (!saved && ls) { saved = ls; queueSave('settings', ls); }
+      if (!savedBiz && lb) { savedBiz = lb; queueSave('biz', lb); }
+    }
+    if (savedBiz) { biz = { balance: 0, balanceAt: 0, items: [], ...savedBiz }; bizExample = false; }
+    if (saved) {
+      settings = saved; privExample = false;
+      periodStart = periodFor(today, settings.startDay);
+      await loadPeriod();
+      // przeniesienie wydatków służbowych zapisanych w poprzedniej wersji (w okresie wypłaty)
+      if (!savedBiz && Array.isArray(period.biz) && period.biz.length) {
+        biz = { balance: period.advance || 0, balanceAt: 0, items: period.biz.map((e, i) => ({ ...e, t: e.t || i + 1 })) };
+        bizExample = false; persistBiz();
+      }
+    }
+    if (mode === 'account') { watchDoc('settings', applySettings); watchDoc('biz', applyBiz); watchPeriod(); }
+    render();
+  }
+  boot();
+})();
+</script>
+</body>
+</html>
