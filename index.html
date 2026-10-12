@@ -97,6 +97,8 @@ details summary { cursor: pointer; color: var(--muted); font-size: .88rem; paddi
 .login-box { max-width: 340px; display: grid; gap: 12px; text-align: center; }
 .login-box p { margin: 0; color: var(--muted); }
 .login-err { color: var(--neg) !important; font-size: .85rem; min-height: 1.2em; }
+.dlg-msg { margin: 0; color: var(--neg); font-size: .85rem; }
+.dlg-msg:empty { display: none; }
 .head-right { display: grid; justify-items: end; gap: 4px; }
 .sync { font-size: .72rem; color: var(--pos); }
 .sync::before { content: "● "; }
@@ -211,6 +213,7 @@ dialog h3 { font-family: var(--f-display); margin: 0; font-size: 1.1rem; }
         <small>Wpisz kwotę, którą widzisz teraz w banku. Wydatki dodane od tej chwili będą od niej odejmowane.</small>
       </div>
     </div>
+    <p class="dlg-msg" id="dlgMsg" role="alert"></p>
     <div class="actions">
       <button type="button" class="ghost" id="logout" hidden style="margin-right:auto">Wyloguj</button>
       <button type="button" class="ghost" id="cancelSettings">Anuluj</button>
@@ -285,15 +288,21 @@ dialog h3 { font-family: var(--f-display); margin: 0; font-size: 1.1rem; }
   };
   const inflight = {};
   function setStatus(text, bad) { const el = $('syncState'); el.textContent = text; el.classList.toggle('bad', !!bad); }
+  function errText(e) {
+    const c = String((e && (e.code || e.message)) || 'błąd');
+    if (/permission/i.test(c)) return 'brak dostępu do bazy – sprawdź reguły w Realtime Database';
+    return c;
+  }
   function notReady() {
     if (mode !== 'connecting') return false;
-    $('saveState').textContent = 'Chwila, łączę się z Twoim kontem… Spróbuj za sekundę.';
+    const msg = 'Strona jeszcze nie połączyła się z bazą. Poczekaj chwilę albo odśwież stronę.';
+    $('saveState').textContent = msg; $('dlgMsg').textContent = msg;
     return true;
   }
   function watchDoc(name, apply) {
     const ref = db.ref(docPath(name));
     const cb = s => { if (inflight[name]) return; apply(s.exists() ? clone(s.val()) : null); };
-    ref.on('value', cb, e => setStatus('Synchronizacja przerwana (' + (e && (e.code || e.message)) + '). Odśwież stronę.', true));
+    ref.on('value', cb, e => setStatus('Błąd: ' + errText(e), true));
     return () => ref.off('value', cb);
   }
   let unsubPeriod = null;
@@ -402,6 +411,7 @@ dialog h3 { font-family: var(--f-display); margin: 0; font-size: 1.1rem; }
   function emptyLi(text) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = text; return li; }
 
   function render() {
+    if (!period || !settings || !biz) return;
     const end = periodEnd(periodStart);
     $('periodLabel').textContent = short(periodStart) + ' – ' + short(end) + ' ' + end.getFullYear();
     $('periodBar').style.visibility = tab === 'priv' ? 'visible' : 'hidden';
@@ -483,7 +493,7 @@ dialog h3 { font-family: var(--f-display); margin: 0; font-size: 1.1rem; }
     inflight[name] = (inflight[name] || 0) + 1;
     saveChain = saveChain.then(() => store.set(name, data)).then(
       () => { $('saveState').textContent = mode === 'account' ? 'Zapisano na koncie' : 'Zapisano w tej przeglądarce'; },
-      e => { $('saveState').textContent = 'Nie udało się zapisać (' + ((e && e.code) || 'błąd') + '). Odśwież stronę i spróbuj ponownie.'; setStatus('Błąd zapisu', true); })
+      e => { $('saveState').textContent = 'Nie udało się zapisać: ' + errText(e) + '.'; setStatus('Błąd zapisu: ' + errText(e), true); })
       .then(() => { inflight[name]--; });
   }
   function persist() {
@@ -533,6 +543,7 @@ dialog h3 { font-family: var(--f-display); margin: 0; font-size: 1.1rem; }
     $('calcPreview').textContent = 'Do wydania ' + fmt(pool) + ' przez ' + n + ' dni = ' + fmt(pool / n) + ' dziennie';
   }
   function openSettings() {
+    $('dlgMsg').textContent = '';
     const priv = tab === 'priv';
     $('privFields').hidden = !priv; $('bizFields').hidden = priv;
     ['sIncome', 'sSavings', 'sStart'].forEach(id => { $(id).required = priv; });
@@ -589,15 +600,16 @@ dialog h3 { font-family: var(--f-display); margin: 0; font-size: 1.1rem; }
     setTab(tab);
     await loadPeriod();
     setStatus('Łączenie…');
-    const user = await connectFirebase();
-    if (user) { db = firebase.database(); uid = user.uid; }
+    let user = null, fbErr = null;
+    try { user = await connectFirebase(); if (user) { db = firebase.database(); uid = user.uid; } }
+    catch (e) { fbErr = e; db = null; }
     mode = db ? 'account' : 'local';
-    setStatus(db ? 'Zapis w chmurze' : 'Zapis tylko w tej przeglądarce', !db);
+    setStatus(db ? 'Zapis w chmurze' : fbErr ? 'Błąd Firebase: ' + errText(fbErr) + ' (zapis tylko w przeglądarce)' : 'Zapis tylko w tej przeglądarce', !db);
     $('logout').hidden = !db;
     $('saveState').textContent = '';
     let saved = null, savedBiz = null;
     try { [saved, savedBiz] = await Promise.all([store.get('settings'), store.get('biz')]); }
-    catch (e) { setStatus('Nie udało się wczytać danych (' + ((e && e.code) || 'błąd') + ')', true); }
+    catch (e) { setStatus('Błąd: ' + errText(e), true); }
     if (mode === 'account') {
       // dane wpisane wcześniej, gdy strona zapisała je tylko w przeglądarce
       const ls = local('settings'), lb = local('biz');
